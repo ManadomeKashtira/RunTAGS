@@ -20,7 +20,7 @@
     <div class="max-w-7xl mx-auto px-4 py-3">
       <div class="flex justify-between items-center">
         <h1 class="text-xl font-bold text-blue-600">Tag Generator</h1>
-        <a href="Page%20single.html" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+        <a href="Page%20single.html" target="_blank" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
           Single
         </a>
       </div>
@@ -44,7 +44,7 @@
             class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
           />
         </div>
-
+        
         <!-- Settings -->
         <div class="bg-white p-6 rounded-lg shadow-md">
           <div class="grid grid-cols-1 gap-4 mb-6">
@@ -74,7 +74,6 @@
               />
             </div>
           </div>
-          
           <div class="flex flex-wrap gap-3">
             <button
               onclick="generateTags(1)"
@@ -108,7 +107,7 @@
       <div class="lg:col-span-2 space-y-6">
         <!-- Column Settings -->
         <div id="columnDisplay" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
-
+        
         <!-- Output -->
         <div class="bg-white rounded-lg shadow-md p-6">
           <h3 class="text-lg font-medium text-gray-800 mb-3">Generated Tags:</h3>
@@ -144,17 +143,14 @@
     function handleFileUpload(event) {
       const file = event.target.files[0];
       if (!file) return;
-
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
           const text = e.target.result;
           columns = processCSV(text);
-          
           if (columns.length === 0) {
             throw new Error("Empty CSV file or invalid format");
           }
-          
           displayColumns();
           tagOutput.value = 'CSV loaded! Configure columns and click Generate Tags';
         } catch (error) {
@@ -169,7 +165,7 @@
       const lines = csvText.trim().split('\n');
       const headers = lines[0].split(',').map(h => h.trim());
       const dataRows = lines.slice(1);
-
+      
       return headers.map((header, colIndex) => {
         const values = [];
         dataRows.forEach(line => {
@@ -179,11 +175,13 @@
             values.push(trimmed);
           }
         });
-
+        
         return {
           name: header || `Column ${colIndex + 1}`,
           excluded: false,
           weight: 1,
+          maxPerColumn: 5,
+          enableMax: true, // New property to control max tag limit
           values: values
         };
       });
@@ -192,15 +190,14 @@
     function displayColumns() {
       const container = document.getElementById('columnDisplay');
       container.innerHTML = '';
-
+      
       columns.forEach((column, colIndex) => {
         const box = document.createElement('div');
         box.className = 'bg-white border border-gray-200 rounded-lg p-4 shadow-sm';
-
+        
         // Header
         const header = document.createElement('div');
         header.className = 'flex justify-between items-center mb-3';
-        
         const title = document.createElement('h3');
         title.className = 'font-semibold text-gray-800';
         title.textContent = `${column.name} (${column.values.length})`;
@@ -208,7 +205,6 @@
         const excludeLabel = document.createElement('label');
         excludeLabel.className = 'flex items-center';
         excludeLabel.innerHTML = `<span class="text-sm text-gray-600 mr-2">Exclude</span>`;
-        
         const excludeInput = document.createElement('input');
         excludeInput.type = 'checkbox';
         excludeInput.checked = column.excluded;
@@ -217,23 +213,21 @@
           columns[colIndex].excluded = excludeInput.checked;
           displayColumns();
         });
-        
         excludeLabel.appendChild(excludeInput);
+        
         header.appendChild(title);
         header.appendChild(excludeLabel);
         box.appendChild(header);
-
-        // Weight control with slider
+        
+        // Weight control
         const weightGroup = document.createElement('div');
         weightGroup.className = 'mb-3';
-        
         const weightLabel = document.createElement('label');
         weightLabel.className = 'flex justify-between items-center text-sm font-medium text-gray-700 mb-1';
         weightLabel.innerHTML = `
           <span>Weight (↑ = fewer tags)</span>
           <span id="weightValue-${colIndex}">${column.weight}</span>
         `;
-        
         const weightSlider = document.createElement('input');
         weightSlider.type = 'range';
         weightSlider.min = '1';
@@ -247,30 +241,86 @@
         weightGroup.appendChild(weightLabel);
         weightGroup.appendChild(weightSlider);
         box.appendChild(weightGroup);
-
+        
+        // Max per column control with toggle
+        const maxPerColumnGroup = document.createElement('div');
+        maxPerColumnGroup.className = 'mb-3';
+        const maxPerColumnHeader = document.createElement('div');
+        maxPerColumnHeader.className = 'flex justify-between items-center mb-1';
+        const maxPerColumnLabel = document.createElement('label');
+        maxPerColumnLabel.className = 'text-sm font-medium text-gray-700';
+        maxPerColumnLabel.textContent = 'Max Tags/Column';
+        const maxPerColumnToggle = document.createElement('label');
+        maxPerColumnToggle.className = 'inline-flex items-center cursor-pointer';
+        maxPerColumnToggle.innerHTML = `
+          <span class="mr-2 text-xs text-gray-600">Disabled</span>
+          <span class="relative">
+            <input 
+              type="checkbox" 
+              id="enableMax-${colIndex}"
+              checked
+              class="sr-only peer"
+              onchange="toggleMaxColumn(${colIndex}, this.checked)"
+            />
+            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+          </span>
+          <span class="ml-2 text-xs text-gray-600">Enabled</span>
+        `;
+        maxPerColumnHeader.appendChild(maxPerColumnLabel);
+        maxPerColumnHeader.appendChild(maxPerColumnToggle);
+        maxPerColumnGroup.appendChild(maxPerColumnHeader);
+        
+        const maxPerColumnSlider = document.createElement('input');
+        maxPerColumnSlider.type = 'range';
+        maxPerColumnSlider.id = `maxPerColumnSlider-${colIndex}`;
+        maxPerColumnSlider.min = '0';
+        maxPerColumnSlider.max = '10';
+        maxPerColumnSlider.value = column.maxPerColumn;
+        maxPerColumnSlider.className = 'w-full h-2 bg-green-100 rounded-lg appearance-none cursor-pointer';
+        maxPerColumnSlider.addEventListener('input', (e) => {
+          updateMaxPerColumn(colIndex, e.target.value);
+        });
+        
+        const maxPerColumnValue = document.createElement('div');
+        maxPerColumnValue.className = 'flex justify-between mt-1';
+        maxPerColumnValue.innerHTML = `
+          <span class="text-xs text-gray-500">Min</span>
+          <span id="maxPerColumnValue-${colIndex}" class="text-sm font-medium">${column.maxPerColumn}</span>
+          <span class="text-xs text-gray-500">Max</span>
+        `;
+        
+        maxPerColumnGroup.appendChild(maxPerColumnSlider);
+        maxPerColumnGroup.appendChild(maxPerColumnValue);
+        box.appendChild(maxPerColumnGroup);
+        
         // Values preview
         const preview = document.createElement('div');
         preview.className = 'max-h-40 overflow-y-auto pr-2';
-        
-        // Show up to 5 sample values
         column.values.slice(0, 5).forEach((value, i) => {
           const item = document.createElement('div');
           item.className = 'text-sm text-gray-600 truncate py-1';
           item.textContent = value;
           preview.appendChild(item);
         });
-        
         if (column.values.length > 5) {
           const more = document.createElement('div');
           more.className = 'text-sm text-gray-500 italic py-1';
           more.textContent = `+ ${column.values.length - 5} more`;
           preview.appendChild(more);
         }
-
+        
         box.appendChild(preview);
         container.appendChild(box);
       });
     }
+
+    // Added toggleMaxColumn function
+    window.toggleMaxColumn = function(colIndex, isChecked) {
+      columns[colIndex].enableMax = isChecked;
+      const slider = document.getElementById(`maxPerColumnSlider-${colIndex}`);
+      slider.disabled = !isChecked;
+      slider.classList.toggle('opacity-50', !isChecked);
+    };
 
     function updateWeight(colIndex, newValue) {
       const valueDisplay = document.getElementById(`weightValue-${colIndex}`);
@@ -280,27 +330,48 @@
       }
     }
 
+    function updateMaxPerColumn(colIndex, newValue) {
+      const valueDisplay = document.getElementById(`maxPerColumnValue-${colIndex}`);
+      if (valueDisplay) {
+        valueDisplay.textContent = newValue;
+        columns[colIndex].maxPerColumn = parseInt(newValue);
+      }
+    }
+
     function getRandomTags(maxTags) {
       let allItems = [];
+      let columnCounts = {};
       
       columns.forEach(column => {
         if (!column.excluded && column.values.length > 0) {
-          // Use inverse weight (higher weight = less likely to be selected)
           const effectiveWeight = 1 / column.weight;
-          allItems.push(...column.values.map(value => ({ value, weight: effectiveWeight })));
+          columnCounts[column.name] = 0;
+          allItems.push(...column.values.map(value => ({
+            value,
+            weight: effectiveWeight,
+            column: column.name,
+            maxPerColumn: column.maxPerColumn,
+            enableMax: column.enableMax
+          })));
         }
       });
-
+      
       if (allItems.length === 0) return [];
-
-      // Use weighted random selection without duplicates
+      
       const result = [];
       const availableValues = [...new Set(allItems.map(item => item.value))];
       
       while (result.length < maxTags && availableValues.length > 0) {
         const totalWeight = availableValues.reduce((sum, value) => {
-          const itemWeight = allItems.find(i => i.value === value)?.weight || 0;
-          return sum + itemWeight;
+          const item = allItems.find(i => i.value === value);
+          if (!item) return sum;
+          
+          // Skip if column max reached and max is enabled
+          if (item.enableMax && columnCounts[item.column] >= item.maxPerColumn) {
+            return sum;
+          }
+          
+          return sum + item.weight;
         }, 0);
         
         if (totalWeight === 0) break;
@@ -309,12 +380,18 @@
         let cumulative = 0;
         
         for (const value of availableValues) {
-          const itemWeight = allItems.find(i => i.value === value)?.weight || 0;
-          cumulative += itemWeight;
+          const item = allItems.find(i => i.value === value);
+          if (!item) continue;
           
+          // Skip if column max reached and max is enabled
+          if (item.enableMax && columnCounts[item.column] >= item.maxPerColumn) {
+            continue;
+          }
+          
+          cumulative += item.weight;
           if (random <= cumulative) {
             result.push(value);
-            // Remove selected value to prevent duplicates
+            columnCounts[item.column]++; // Increment column counter
             availableValues.splice(availableValues.indexOf(value), 1);
             break;
           }
@@ -327,36 +404,43 @@
     function generateTags(count = 1) {
       const maxTags = parseInt(document.getElementById('tagCount').value) || 12;
       const tagsList = [];
-      
       for (let i = 0; i < count; i++) {
         tagsList.push(getRandomTags(maxTags));
       }
-      
       displayTags(tagsList);
     }
 
     function displayTags(tagsList) {
       let outputText = '';
       const separator = document.getElementById('separator').value || ', ';
-      
       tagsList.forEach((tags, index) => {
-        outputText += `${tags.length} tags: ${tags.join(separator)}\n`;
+        outputText += `${tags.join(separator)}\n`;
       });
-      
       tagOutput.value = outputText.trim();
     }
 
     function copyToClipboard() {
-      tagOutput.select();
-      document.execCommand('copy');
-      showNotification('Copied to clipboard!');
+      const text = tagOutput.value;
+      // Only copy the actual tags without the count prefixes
+      const cleanedText = text
+        .replace(/^\d+ tags: /gm, '')  // Remove count prefixes
+        .replace(/(?:\r?\n){2,}/g, '\n'); // Normalize multiple newlines
+      
+      navigator.clipboard.writeText(cleanedText).then(() => {
+        showNotification('Copied tags to clipboard!');
+      }).catch(err => {
+        console.error('Failed to copy: ', err);
+        showNotification('Failed to copy tags!');
+      });
     }
 
     function resetSettings() {
       columns = columns.map(column => ({
         ...column,
         excluded: false,
-        weight: 1
+        weight: 1,
+        maxPerColumn: 5,
+        enableMax: true
       }));
       displayColumns();
     }
